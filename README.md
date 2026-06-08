@@ -1,36 +1,111 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Healthcare AI
 
-## Getting Started
+Turns raw consultation notes into a record summary, next steps, and a patient email — streamed live as the model writes.
 
-First, run the development server:
+<div align="center">
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+![Stars](https://img.shields.io/github/stars/euginevd/healthcare-ai?style=for-the-badge&logo=github)
+![Forks](https://img.shields.io/github/forks/euginevd/healthcare-ai?style=for-the-badge&logo=github)
+![Issues](https://img.shields.io/github/issues/euginevd/healthcare-ai?style=for-the-badge&logo=github)
+![License](https://img.shields.io/github/license/euginevd/healthcare-ai?style=for-the-badge)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+
+</div>
+
+---
+
+## 🩺 What is this?
+
+Doctors leave a consultation with notes scribbled in shorthand, and then spend extra time turning those notes into a clean record entry, a checklist of next steps, and a message the patient can actually understand. This app takes the raw notes, sends them to an LLM, and streams back all three of those artifacts side by side as they're generated — so the write-up that used to take ten minutes after each visit takes one.
+
+---
+
+## ✨ What it does
+
+| Feature | Description |
+| --- | --- |
+| Consultation intake | A form to log a patient name, visit date, and free-text notes, which is saved to Postgres. |
+| Live AI generation | Server-Sent Events stream the model's output token by token into three markdown cards: summary, next steps, patient email. |
+| Authentication | Sign-in and session handling via Clerk, gating both the UI and the API behind a logged-in user. |
+
+---
+
+## 🏗️ How it's built
+
+```
+healthcare-ai/
+├── app/
+│   ├── page.tsx              # Landing page + sign-in (Clerk)
+│   ├── layout.tsx            # Root layout, ClerkProvider, page metadata
+│   └── consult/
+│       ├── new/page.tsx      # Intake form: patient, visit date, notes
+│       └── [id]/page.tsx     # Live SSE view of the generated sections
+├── api/
+│   └── index.py              # FastAPI backend: Postgres + OpenAI streaming
+├── proxy.ts                  # Clerk auth middleware (renamed from `middleware` in this Next.js version)
+├── requirements.txt          # Python deps for the FastAPI backend
+└── public/
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The frontend is Next.js (App Router). The backend is a small FastAPI service that stores consultations in Postgres and calls the OpenAI API with `client.responses.stream(...)`, asking the model to emit three sections delimited by `===SUMMARY===`, `===NEXT_STEPS===`, and `===PATIENT_EMAIL===` markers. The frontend opens an `EventSource` connection to `/generate`, splits the incoming text on those markers, and renders each section as markdown with `react-markdown` as it arrives.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 🚀 Quick start
 
-## Learn More
+1. Install frontend and backend dependencies:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+pip install -r requirements.txt
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+2. Copy `.env.example` to `.env` and fill in `OPENAI_API_KEY`, `DATABASE_URL`, and your Clerk keys:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cp .env.example .env
+```
 
-## Deploy on Vercel
+3. Run both services (in separate terminals):
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+uvicorn api.index:app --reload --port 8000
+npm run dev
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Open [http://localhost:3000](http://localhost:3000), sign in, and start a new consultation.
+
+---
+
+## 🧰 Tech stack
+
+**Frontend**
+Next.js 16, React 19, TypeScript, Tailwind CSS, `react-markdown` + `remark-gfm` for rendering streamed sections, `react-day-picker` for the visit date.
+
+**Backend**
+FastAPI, `psycopg` for Postgres access, native Server-Sent Events for streaming.
+
+**Integrations**
+Clerk for authentication, OpenAI (`gpt-4o-mini`) for generation.
+
+---
+
+## 🤝 Contributing
+
+This is a personal project, not yet set up for outside contributions. If you spot a bug or have a suggestion, please open an [issue](https://github.com/euginevd/healthcare-ai/issues).
+
+---
+
+## 🗺️ Roadmap
+
+| Status | Item |
+| --- | --- |
+| ✅ | Consultation intake, streaming generation, and auth |
+| 🔜 | Editable/regeneratable sections after first generation |
+| 🔜 | Exporting the patient email directly to a messaging integration |
+
+---
+
+## 📄 License
+
+Released under the [MIT License](./LICENSE).
