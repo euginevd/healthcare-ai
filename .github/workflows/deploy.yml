@@ -2,14 +2,14 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths-ignore:
       - "infra/**"
   # Also run after infra provisions (e.g. new EC2 spun up)
   workflow_run:
     workflows: ["Provision Infrastructure"]
     types: [completed]
-    branches: [master]
+    branches: [main]
 
 permissions:
   id-token: write

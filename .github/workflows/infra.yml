@@ -2,7 +2,7 @@ name: Provision Infrastructure
 
 on:
   push:
-    branches: [master]
+    branches: [main]
     paths:
       - "infra/**"
       - ".github/workflows/infra.yml"

@@ -5,10 +5,10 @@
 ```
 GitHub (source code)
     │
-    ├── push to master (infra/ changed)
+    ├── push to main (infra/ changed)
     │       └── infra.yml → terraform apply → EC2 + ECR + OIDC role on AWS
     │
-    └── push to master (app code changed)
+    └── push to main (app code changed)
             └── deploy.yml → build images → push to ECR → SSH to EC2 → docker compose up
 ```
 
@@ -36,13 +36,13 @@ AWS (runtime)
 ## How CI/CD Works
 
 ### `infra.yml` — Infrastructure provisioning
-- Triggers on push to `master` when files under `infra/` change
+- Triggers on push to `main` when files under `infra/` change
 - Authenticates to AWS via OIDC (no static keys)
 - Runs `terraform apply` — creates/updates EC2, ECR repos, security group, IAM roles
 - Copies `docker-compose.yml` and `nginx.conf` to the EC2 instance
 
 ### `deploy.yml` — Application deployment
-- Triggers on push to `master` when app code changes
+- Triggers on push to `main` when app code changes
 - Also triggers automatically after `infra.yml` completes
 - Authenticates to AWS via OIDC
 - Builds Docker images for Next.js and FastAPI
@@ -148,12 +148,12 @@ Go to: **GitHub repo → Settings → Secrets and variables → Actions**
 
 ## First Deployment
 
-Once all secrets are set, push to master:
+Once all secrets are set, push to main:
 
 ```bash
 git add .
 git commit -m "deploy"
-git push origin master
+git push origin main
 ```
 
 GitHub Actions runs both workflows. The app will be live at:
@@ -167,10 +167,10 @@ http://<EC2_HOST>
 ## Ongoing Operations
 
 ### Deploy app changes
-Push to `master`. `deploy.yml` runs automatically — builds, pushes, restarts.
+Push to `main`. `deploy.yml` runs automatically — builds, pushes, restarts.
 
 ### Change infrastructure
-Edit any file under `infra/`, push to `master`. `infra.yml` runs `terraform apply`.
+Edit any file under `infra/`, push to `main`. `infra.yml` runs `terraform apply`.
 
 ### SSH into the EC2 instance
 ```bash
