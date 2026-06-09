@@ -1,0 +1,10 @@
+aws_region  = "us-east-1"
+project     = "healthcare-ai"
+github_org  = "euginevd"
+github_repo = "healthcare-ai"
+
+# Find the latest AL2023 AMI for your region:
+# aws ec2 describe-images --owners amazon \
+#   --filters "Name=name,Values=al2023-ami-*-x86_64" \
+#   --query 'sort_by(Images,&CreationDate)[-1].ImageId' --output text
+ec2_ami = "ami-0c101f26f147fa7fd"

@@ -1,0 +1,82 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - "infra/**"
+  # Also run after infra provisions (e.g. new EC2 spun up)
+  workflow_run:
+    workflows: ["Provision Infrastructure"]
+    types: [completed]
+    branches: [master]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Resolve EC2 IP from Terraform state
+        id: ec2
+        run: |
+          STATE=$(aws s3 cp s3://${{ secrets.TF_STATE_BUCKET }}/healthcare-ai/terraform.tfstate -)
+          IP=$(echo "$STATE" | python3 -c "import sys,json; s=json.load(sys.stdin); print(next(o['value'] for o in s['outputs'].values() if o.get('value') and '.' in str(o.get('value','')) and o == s['outputs'].get('ec2_public_ip', o)))" 2>/dev/null || \
+               echo "$STATE" | python3 -c "import sys,json; print(json.load(sys.stdin)['outputs']['ec2_public_ip']['value'])")
+          echo "ip=$IP" >> $GITHUB_OUTPUT
+
+      - name: Build and push Next.js image
+        env:
+          REPO: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/healthcare-ai-nextjs
+        run: |
+          docker build -f Dockerfile.nextjs -t $REPO:latest .
+          docker push $REPO:latest
+
+      - name: Build and push API image
+        env:
+          REPO: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/healthcare-ai-api
+        run: |
+          docker build -f Dockerfile.api -t $REPO:latest .
+          docker push $REPO:latest
+
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.ip }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ec2-user/healthcare-ai
+
+            cat > .env << 'EOF'
+            AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}
+            AWS_REGION=${{ secrets.AWS_REGION }}
+            EC2_PUBLIC_IP=${{ steps.ec2.outputs.ip }}
+            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}
+            CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+            EOF
+
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+              docker login --username AWS --password-stdin \
+              ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
