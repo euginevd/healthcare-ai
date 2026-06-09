@@ -65,41 +65,6 @@ resource "aws_s3_bucket_public_access_block" "tf_state" {
   restrict_public_buckets = true
 }
 
-# IAM user with just enough permissions for the one-time bootstrap
-# After bootstrap, GitHub Actions uses OIDC — this user can be deleted
-resource "aws_iam_user" "bootstrap" {
-  name = "${var.project}-bootstrap"
-}
-
-resource "aws_iam_user_policy" "bootstrap" {
-  user = aws_iam_user.bootstrap.name
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = ["s3:*"]
-        Resource = [aws_s3_bucket.tf_state.arn, "${aws_s3_bucket.tf_state.arn}/*"]
-      },
-      {
-        # Permissions needed to create the main infra (EC2, ECR, IAM, OIDC)
-        Effect = "Allow"
-        Action = [
-          "ec2:*",
-          "ecr:*",
-          "iam:*",
-          "sts:GetCallerIdentity"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_access_key" "bootstrap" {
-  user = aws_iam_user.bootstrap.name
-}
-
 # OIDC provider so GitHub Actions can authenticate to AWS without static credentials
 resource "aws_iam_openid_connect_provider" "github" {
   url             = "https://token.actions.githubusercontent.com"
@@ -147,15 +112,6 @@ data "aws_caller_identity" "current" {}
 
 output "s3_bucket_name" {
   value = aws_s3_bucket.tf_state.bucket
-}
-
-output "bootstrap_access_key_id" {
-  value = aws_iam_access_key.bootstrap.id
-}
-
-output "bootstrap_secret_access_key" {
-  value     = aws_iam_access_key.bootstrap.secret
-  sensitive = true
 }
 
 output "github_actions_role_arn" {

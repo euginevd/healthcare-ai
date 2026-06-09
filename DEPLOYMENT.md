@@ -3,10 +3,17 @@
 ## Architecture
 
 ```
-GitHub (source code)
+Bootstrap (run once from CloudShell)
+    └── infra/bootstrap/
+        ├── S3 bucket      (Terraform state)
+        └── OIDC provider + IAM role  (GitHub Actions auth — no static keys)
+```
+
+```
+Main infrastructure (managed by GitHub Actions via OIDC)
     │
     ├── push to main (infra/ changed)
-    │       └── infra.yml → terraform apply → EC2 + ECR + OIDC role on AWS
+    │       └── infra.yml → terraform apply → EC2 + ECR + security group
     │
     └── push to main (app code changed)
             └── deploy.yml → build images → push to ECR → SSH to EC2 → docker compose up
@@ -15,6 +22,7 @@ GitHub (source code)
 ```
 AWS (runtime)
     │
+    ├── S3          (Terraform state)
     ├── ECR
     │   ├── healthcare-ai-nextjs   (Next.js image)
     │   └── healthcare-ai-api      (FastAPI image)
@@ -80,7 +88,7 @@ git clone https://github.com/euginevd/healthcare-ai.git
 cd healthcare-ai/infra/bootstrap
 ```
 
-### 4. Create S3 state bucket + bootstrap IAM user
+### 4. Create S3 state bucket + OIDC role
 
 ```bash
 terraform init
@@ -90,9 +98,8 @@ terraform apply
 Note the outputs — you will need them shortly:
 
 ```bash
-terraform output s3_bucket_name             # → TF_STATE_BUCKET
-terraform output bootstrap_access_key_id    # temporary, used in next step only
-terraform output -raw bootstrap_secret_access_key
+terraform output s3_bucket_name          # → TF_STATE_BUCKET
+terraform output github_actions_role_arn # → AWS_ROLE_ARN
 ```
 
 ### 5. Run the main terraform apply
@@ -105,7 +112,7 @@ cd ../
 terraform init \
   -backend-config="bucket=$(cd bootstrap && terraform output -raw s3_bucket_name)" \
   -backend-config="key=healthcare-ai/terraform.tfstate" \
-  -backend-config="region=us-east-1" \
+  -backend-config="region=ap-southeast-2" \
   -backend-config="encrypt=true" \
   -backend-config="use_lockfile=true"
 
@@ -117,10 +124,9 @@ terraform apply \
 ### 6. Save the outputs
 
 ```bash
-terraform output ec2_public_ip              # → EC2_HOST
-terraform output github_actions_role_arn    # → AWS_ROLE_ARN
-terraform output aws_account_id             # → AWS_ACCOUNT_ID
-cat healthcare-ai-key.pem                   # → EC2_SSH_KEY (full file contents)
+terraform output ec2_public_ip    # → EC2_HOST
+terraform output aws_account_id   # → AWS_ACCOUNT_ID
+cat healthcare-ai-key.pem         # → EC2_SSH_KEY (full file contents)
 ```
 
 ---
@@ -131,9 +137,9 @@ Go to: **GitHub repo → Settings → Secrets and variables → Actions**
 
 | Secret | Where it comes from |
 |---|---|
-| `AWS_REGION` | The region you deployed into e.g. `us-east-1` |
-| `AWS_ACCOUNT_ID` | `terraform output aws_account_id` |
-| `AWS_ROLE_ARN` | `terraform output github_actions_role_arn` |
+| `AWS_REGION` | `ap-southeast-2` |
+| `AWS_ACCOUNT_ID` | `terraform output aws_account_id` (from main infra) |
+| `AWS_ROLE_ARN` | `terraform output github_actions_role_arn` (from bootstrap) |
 | `TF_STATE_BUCKET` | `terraform output s3_bucket_name` (from bootstrap) |
 | `EC2_HOST` | `terraform output ec2_public_ip` |
 | `EC2_SSH_KEY` | Contents of `infra/healthcare-ai-key.pem` |
