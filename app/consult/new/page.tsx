@@ -6,8 +6,6 @@ import { DayPicker } from 'react-day-picker';
 import { format } from 'date-fns';
 import 'react-day-picker/style.css';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
-
 export default function NewConsultationPage() {
   const router = useRouter();
   const [patientName, setPatientName] = useState('');
@@ -21,7 +19,7 @@ export default function NewConsultationPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_URL}/api/consultations`, {
+      const res = await fetch(`/api/consultations`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

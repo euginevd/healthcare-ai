@@ -5,8 +5,6 @@ import { useParams } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
-
 export default function ConsultationPage() {
   const { id } = useParams<{ id: string }>();
   const [text, setText] = useState('');
@@ -17,7 +15,7 @@ export default function ConsultationPage() {
     if (startedRef.current) return;
     startedRef.current = true;
 
-    const eventSource = new EventSource(`${API_URL}/api/consultations/${id}/generate`);
+    const eventSource = new EventSource(`/api/consultations/${id}/generate`);
 
     eventSource.onmessage = (event) => {
       const payload = JSON.parse(event.data);

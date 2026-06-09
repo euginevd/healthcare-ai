@@ -78,14 +78,14 @@ def create_consultation(consultation: ConsultationIn):
 
 
 @app.get("/api/consultations/{consultation_id}/generate")
-def generate(consultation_id: int):
+async def generate(consultation_id: int):
     with psycopg.connect(DATABASE_URL) as conn:
         row = conn.execute(
             "SELECT notes FROM consultations WHERE id = %s", (consultation_id,)
         ).fetchone()
     notes = row[0]
 
-    def stream():
+    async def stream():
         full_text = ""
         with client.responses.stream(
             model="gpt-4o-mini",
